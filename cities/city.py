@@ -1,0 +1,136 @@
+import pandas as pd
+import json
+from config import ENGINE
+
+
+def get_cities_list():
+    table = pd.read_sql("""
+        SELECT country_name, city, country_code, airport_name_ru, ST_X(geometry) as x, ST_Y(geometry) as y FROM wikipedia.cities_available
+        ORDER BY airport_name_ru
+    """, ENGINE)
+    countries = table['country_name'].unique()
+    d = []
+    for country in countries:
+        cities = table.query("country_name == '%s'" %country).reset_index()
+        d.append({
+            "country_name": country,
+            "country_code": cities.loc[0, 'country_code'],
+            "cities_count": len(cities),
+            "children": json.loads(cities.to_json(orient="records"))
+        })
+    return sorted(d, key=lambda x: x['country_name'])
+
+
+class City:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+    def get_hinterland_numbers(self):
+        df = pd.read_sql("""
+            select year, hinterland_size::integer as value, year::integer as name from wikipedia.hinterland_size_dynamics
+            where city = '%s' and season = 'summer'
+            order by year desc
+        """ % self.name, ENGINE)
+        a = df['value'].idxmin()
+        c = df['value'].idxmax()
+        current = df.loc[0]
+        l = pd.read_sql("""
+            SELECT date, city_from, min(round) AS min, max(round) AS max FROM wikipedia.routes_length
+            where city_from = '%s'
+            GROUP BY date, city_from
+            ORDER BY date desc;
+        """ % self.name, ENGINE)
+        return {
+            'current': int(current['value']),
+            'min_size': int(df.loc[a, 'value']),
+            'min_label': int(df.loc[a, 'name']),
+            'max_size': int(df.loc[c, 'value']),
+            'max_label': int(df.loc[c, 'name']),
+            'min_length': l['min'].to_list()[0],
+            'max_length': l['max'].to_list()[0]
+        }
+
+
+    def get_hinterland_dynamics(self):
+        df = pd.read_sql("""
+            select hinterland_size as value, year::text as name from wikipedia.hinterland_size_dynamics
+            where city = '%s' and season = 'summer'
+        """ % self.name, ENGINE)
+        return df.to_dict(orient="records")
+
+
+    def hinterland_map(self):
+        df = pd.read_sql("""
+            select * from wikipedia.hinterland_dynamic_for_map
+            where city_from = '%s'
+        """ % self.name, ENGINE)
+        result = {str(int(row['date'])): row['json_build_object'] for index, row in df.iterrows()}
+        return result
+
+
+    def get_hinterland_changes(self, year_from: int, year_to: int):
+        df = pd.read_sql("""
+            select * from wikipedia.city_dates_changes('%s', %s, %s)
+            where destination is not null
+        """ % (self.name, year_from, year_to), ENGINE)
+        return df.to_dict(orient="records")
+
+
+    def get_route_timeline(self, destinations: tuple):
+        df = pd.read_sql("""
+            select airport_name_ru, country_code, array_agg(date) as dates from wikipedia.hinterlands
+            where city_from = '%s' and airport_name_ru in ('%s')
+            group by airport_name_ru, country_code
+        """ % (self.name, "', '".join(destinations)), ENGINE)
+        return df.to_dict(orient="records")
+
+
+    def get_min_max_route_length_dynamics(self):
+        df = pd.read_sql("""
+            SELECT date::text, city_from, min(round) AS min, max(round) AS max FROM wikipedia.routes_length
+            where city_from = '%s'
+            GROUP BY date, city_from
+            ORDER BY date;
+        """ % self.name, ENGINE)
+        results = [
+            {"name": "Длиннейший маршрут", "series": []},
+            {"name": "Кратчайший маршрут", "series": []}
+        ]
+        for index, row in df.iterrows():
+            results[0]['series'].append({'name': row['date'], 'value': row['max']})
+            results[1]['series'].append({'name': row['date'], 'value': row['min']})
+        return results
+
+
+    def get_route_length_distribution(self, year: str):
+        df = pd.read_sql("""
+            select * from wikipedia.routes_length
+            where city_from = '%s' and date = %s
+        """ % (self.name, year), ENGINE)
+
+        bins = pd.IntervalIndex.from_tuples([
+            (0, 1000), (1000, 3000), (3000, 5000), (5000, 7000), (7000, 10000), (10000, 40000)
+        ])
+        result = pd.cut(df['round'], bins).value_counts().sort_index()
+        labels = {
+            '(0, 1000]': 'Менее 1 тыс.км', '(1000, 3000]': '1-3 тыс.км', '(3000, 5000]': '3-5 тыс.км', '(5000, 7000]': '5-7 тыс.км', '(7000, 10000]': '7-10 тыс.км', '(10000, 40000]': 'Более 10 тыс.км'
+        }
+        return [{'name':labels[str(k)], 'value': v} for k,v in result.items()]
+
+    @property
+    def wiki_links(self):
+        query = """
+            SELECT date_part('year'::text, links.date):: text as year, links.date, links.iata, links.link FROM wikipedia.links
+            LEFT JOIN flightradar24.airports ON links.iata = airports.iata
+            where airports.city = '%s'
+            group by airports.city, links.date, links.iata, links.link
+            order by airports.city, links.date
+        """ % self.name
+
+        df = pd.read_sql(query, ENGINE)
+        d = {row['year']:[] for index, row in df.iterrows()}
+        for index, row in df.iterrows():
+            d[row['year']].append({ 'code': row['iata'], 'date': row['date'], 'link': row['link'] })
+
+        return d
