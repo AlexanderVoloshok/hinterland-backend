@@ -1,6 +1,6 @@
 import json
 from flask import Blueprint, request
-from cities.city import City, get_cities_list
+from cities.city import City, get_cities_list, methods_map
 from utils import valid_city
 
 
@@ -16,15 +16,10 @@ def get_available_cities():
 @valid_city
 def dispatch_city_report_by_type(city: str, report_type: str):
     c = City(city)
-    if report_type == 'numbers':
-        return c.get_hinterland_numbers()
-    elif report_type == 'dynamics':
-        return c.get_hinterland_dynamics()
-    elif report_type == 'map':
-        return c.hinterland_map()
-    elif report_type == 'minmaxroutelength':
-        return c.get_min_max_route_length_dynamics()
-    return {"status": "bad", "error": "invalid city action"}, 403
+    m = methods_map(c)
+    if report_type not in m.keys():
+        return {"status": "bad", "error": "invalid city action"}, 403
+    return m[report_type]()
 
 
 @city_bp.route("/<city>/hinterland/change/<year_from>/<year_to>", methods=['GET'])
@@ -38,12 +33,12 @@ def get_hinterland_changes(city: str, year_from: int, year_to: int):
 @valid_city
 def get_route_length_distribution(city: str, year: str):
     try:
-        x = int(year)
+        year = int(year)
     except ValueError:
         return "invalid year", 403
     
     c = City(city)
-    return c.get_route_length_distribution()
+    return c.get_route_length_distribution(year)
 
 
 @city_bp.route("/<city>/routes/timeline", methods=['POST'])
