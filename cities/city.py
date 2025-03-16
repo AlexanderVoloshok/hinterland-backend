@@ -3,15 +3,6 @@ import json
 from sql_utils import read_sql
 
 
-def methods_map(c):
-    return {
-        'numbers': c.get_hinterland_numbers,
-        'dynamics': c.get_hinterland_dynamics,
-        'map': c.hinterland_map,
-        'minmaxroutelength': c.get_min_max_route_length_dynamics,
-        'cities': c.destinations_list
-    }
-
 def prepare_cities_structure(table: pd.DataFrame):
     countries = table['country_name_ru'].unique()
     d = []
@@ -137,6 +128,19 @@ class City:
             where city_from = '%s'
             group by city_to, airport_name_ru, country_code, country_name_ru""" % self.name)
         return prepare_cities_structure(table)
+
+
+    def airlines_list(self):
+        df = read_sql("""
+            select airline FROM wikipedia.airlines_and_destinations
+            join (
+            	SELECT airport_name, iata, city FROM flightradar24.airports WHERE link IS NOT NULL
+            ) sample on airlines_and_destinations.origin = sample.iata
+            where city = '%s'
+            group by airline
+        """ % self.name)
+        return df['airline'].to_list()
+
 
     @property
     def wiki_links(self):
