@@ -56,7 +56,7 @@ class City:
         }
 
 
-    def get_hinterland_dynamics(self):
+    def get_hinterland_dynamics(self, arrg_type: str):
         df = read_sql("""
             select hinterland_size as value, year::text as name from wikipedia.hinterland_size_dynamics
             where city = '%s' and season = 'summer'
@@ -140,7 +140,6 @@ class City:
             group by airline
         """ % self.name)
         return df['airline'].to_list()
-
 
     @property
     def wiki_links(self):
