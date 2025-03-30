@@ -26,6 +26,8 @@ def dispatch_city_report_by_type(city: str, report_type: str):
         return c.hinterland_map()
     elif report_type == 'minmaxroutelength':
         return c.get_min_max_route_length_dynamics()
+    elif report_type == 'centroids': 
+        return c.centroid_migration()
     elif report_type == 'cities': 
         return c.destinations_list()
     

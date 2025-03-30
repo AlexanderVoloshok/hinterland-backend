@@ -1,6 +1,6 @@
 import pandas as pd
 import json
-from sql_utils import read_sql
+from sql_utils import read_sql, read_postgis
 
 
 def prepare_cities_structure(table: pd.DataFrame):
@@ -123,6 +123,14 @@ class City:
         return [{'name':labels[str(k)], 'value': v} for k,v in result.items()]
 
 
+    def centroid_migration(self):
+        df = read_postgis("""
+            select * from wikipedia.hinterland_centroids
+            where city_from = %s
+        """, params=(self.name,), geom_col="geometry")
+        return json.loads(df.to_json())
+
+
     def destinations_list(self):
         table = read_sql("""select city_to as city, airport_name_ru, country_code, country_name_ru from wikipedia.hinterlands
             where city_from = '%s'
@@ -132,14 +140,15 @@ class City:
 
     def airlines_list(self):
         df = read_sql("""
-            select airline FROM wikipedia.airlines_and_destinations
+            select ad.airline, airls.color FROM wikipedia.airlines_and_destinations ad
             join (
             	SELECT airport_name, iata, city FROM flightradar24.airports WHERE link IS NOT NULL
-            ) sample on airlines_and_destinations.origin = sample.iata
+            ) sample on ad.origin = sample.iata
+            join flightradar24.airlines airls on ad.airline = airls.airline
             where city = '%s'
-            group by airline
+            group by ad.airline, airls.color
         """ % self.name)
-        return df['airline'].to_list()
+        return df.set_index('airline')['color'].to_dict()
 
     @property
     def wiki_links(self):
