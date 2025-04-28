@@ -140,15 +140,18 @@ class City:
 
     def airlines_list(self):
         df = read_sql("""
-            select ad.airline, airls.color FROM wikipedia.airlines_and_destinations ad
+            select ad.airline, airls.color, airls.is_lowcost FROM wikipedia.airlines_and_destinations ad
             join (
             	SELECT airport_name, iata, city FROM flightradar24.airports WHERE link IS NOT NULL
             ) sample on ad.origin = sample.iata
             join flightradar24.airlines airls on ad.airline = airls.airline
             where city = '%s'
-            group by ad.airline, airls.color
+            group by ad.airline, airls.color, airls.is_lowcost
         """ % self.name)
-        return df.set_index('airline')['color'].to_dict()
+        d = {}
+        for _, row in df.iterrows():
+            d[row['airline']] = {'color': row['color'], 'is_lowcost': row['is_lowcost']}
+        return d
 
     @property
     def wiki_links(self):
