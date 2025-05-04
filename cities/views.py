@@ -20,8 +20,9 @@ def dispatch_city_report_by_type(city: str, report_type: str):
     if report_type == 'numbers':
         return c.get_hinterland_numbers()
     elif report_type == 'dynamics': 
-        arrg_type = request.args.get('groupBy')
-        return c.get_hinterland_dynamics(arrg_type)
+        aggr_type = request.args.get('aggr_type') or 'none'
+        airline = request.args.get('airline') or None
+        return c.get_hinterland_dynamics(aggr_type, airline)
     elif report_type == 'map': 
         return c.hinterland_map()
     elif report_type == 'minmaxroutelength':
