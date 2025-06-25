@@ -3,18 +3,34 @@ from functools import wraps
 from config import Config
 
 
+class InfoFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno == logging.INFO
+
+class ErrorFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno >= logging.ERROR
+
 def get_logger(name):
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    file_handler = logging.FileHandler('action.log', mode='a')
-    stream_handler = logging.StreamHandler()
+    logger.setLevel(logging.DEBUG)
+
+    # Хендлер для INFO
+    info_handler = logging.FileHandler('action.log', mode='a')
+    info_handler.setLevel(logging.INFO)
+    info_handler.addFilter(InfoFilter())
     formatter = logging.Formatter('[%(name)s] %(asctime)s %(levelname)-8s %(message)s')
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.INFO)
-    stream_handler.setFormatter(formatter)
-    stream_handler.setLevel(logging.ERROR)
-    logger.addHandler(file_handler)
-    logger.addHandler(stream_handler)
+    info_handler.setFormatter(formatter)
+
+    # Хендлер для EXCEPTION / ERROR
+    error_handler = logging.FileHandler('error.log', mode='a')
+    error_handler.setLevel(logging.ERROR)
+    error_handler.addFilter(ErrorFilter())
+    error_handler.setFormatter(logging.Formatter('%(asctime)s - ERROR - %(message)s'))
+
+    # Добавляем хендлеры к логгеру
+    logger.addHandler(info_handler)
+    logger.addHandler(error_handler)
     return logger
 
 
