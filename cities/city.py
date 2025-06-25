@@ -95,9 +95,9 @@ class City:
         elif arrg_type == 'lcc':
             q = """
                 WITH destinations_by_cost AS (
-                  SELECT date_part('year'::text, date) as date, destination, bool_or(is_lowcost) AS has_true, bool_or(NOT is_lowcost) AS has_false
+                  SELECT date, destination, bool_or(is_lowcost) AS has_true, bool_or(NOT is_lowcost) AS has_false
                   FROM (
-                  	select * from wikipedia.lcc_continent
+                  	select date_part('year'::text, date) as date, destination, is_lowcost from wikipedia.lcc_continent
                 	where origin in (
                 		select iata from flightradar24.airports
                 		where city = '%s'
@@ -141,19 +141,21 @@ class City:
             country = read_sql("SELECT country FROM flightradar24.airports WHERE city = '%s' LIMIT 1" % self.name)
             q = """
                 select date, line_type, count(line_type) from (
-                  	select date_part('year'::text, date) as date, destination, 
-                  	case country 
-                  		when '%s' then 'domestic'
-                  		else 'international'
-                  	end as "line_type"
-                  	from wikipedia.lcc_continent
-                	where origin in (
-                		(
-                        	select iata from flightradar24.airports
-                        	where city = '%s'
-                        	group by iata
-                        )
-                	)
+                    select * from (
+                  	    select date_part('year'::text, date) as date, destination, 
+                  	    case country 
+                  	    	when '%s' then 'domestic'
+                  	    	else 'international'
+                  	    end as "line_type"
+                  	    from wikipedia.lcc_continent
+                	    where origin in (
+                	    	(
+                            	select iata from flightradar24.airports
+                            	where city = '%s'
+                            	group by iata
+                            )
+                	    )
+                    )a group by date, destination, line_type
                 )a group by date, line_type
             """ % (country['country'].values[0], self.name)
         else:
