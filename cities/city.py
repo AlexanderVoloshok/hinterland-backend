@@ -198,6 +198,42 @@ class City:
         return df.to_dict(orient="records")
 
 
+    def get_hinterland_structure(self, year: int = 2024, preset_name: str = None):
+        #Для города (или страны/региона) имеется пресет - список тегов, по которым можно однозначно классифицировать города. У одного города в рамках одного пресетав не может быть двух тегов 
+        if not preset_name:
+            preset = read_sql("select tags from wikipedia.presets where city = '%s'" % self.name)
+        else:
+            preset = read_sql("select tags from wikipedia.presets where preset_name = '%s'" % preset_name)
+        
+        tags_str = "', '".join(preset.loc[0, 'tags'])
+        q = """
+            SELECT name, count(*) as value
+            FROM (
+              SELECT 
+                (
+                  SELECT tag FROM unnest(tags) AS tag
+                  WHERE tag IN ('%s')
+                  LIMIT 1
+                ) AS name
+              FROM wikipedia.hinterlands a
+              WHERE city_from = '%s' AND date = %s
+                AND tags && ARRAY['%s']
+            ) matched
+            GROUP BY name
+
+            UNION ALL
+            -- Подсчёт несовпавших тегов
+            SELECT 'Прочие' AS name, count(*) as value
+            FROM wikipedia.hinterlands a
+            WHERE city_from = '%s' AND date = %s
+              AND NOT (tags && ARRAY['%s'])
+
+            ORDER BY value DESC;        
+        """ % (tags_str, self.name, year, tags_str, self.name, year, tags_str)
+        df = read_sql(q)
+        return df.to_dict(orient="records")
+
+
     def get_route_timeline(self, destinations: tuple):
         df = read_sql("""
             select airport_name_ru, city_to, country_code, array_agg(date) as dates from wikipedia.hinterlands

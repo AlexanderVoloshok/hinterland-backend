@@ -54,6 +54,18 @@ def get_route_length_distribution(city: str, year: str):
     return c.get_route_length_distribution(year)
 
 
+@city_bp.route("/<city>/hinterland/<year>/structure", methods=['GET'])
+@valid_city
+def get_hinterland_structure(city: str, year: str):
+    try:
+        year = int(year)
+    except ValueError:
+        return "invalid year", 403
+    
+    c = City(city)
+    return c.get_hinterland_structure(year)
+
+
 @city_bp.route("/<city>/routes/timeline", methods=['POST'])
 @valid_city
 def get_route_timeline(city: str):
