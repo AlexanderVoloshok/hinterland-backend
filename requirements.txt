@@ -1,0 +1,12 @@
+gunicorn
+flask==3.0.0
+flask-cors==3.0.10
+requests
+sqlalchemy==2.0.41
+python-dotenv
+pandas==2.0.3
+pyproj
+geopandas==0.12.2
+fiona==1.9.5
+psycopg2-binary
+openpyxl==3.0.9
