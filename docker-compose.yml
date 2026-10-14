@@ -6,11 +6,11 @@ services:
       - .env
     expose:
       - "5000"
-    networks:
-      default: {}
-      shared:
-        aliases:
-          - flask-api-backend
+    #networks:
+    #  default: {}
+    #  shared:
+    #    aliases:
+    #      - flask-api-backend
     ports:
       - "127.0.0.1:5000:5000"
     logging:
@@ -19,7 +19,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-networks:
-  shared:
-    external: true
-    name: shared-services
+#networks:
+#  shared:
+#    external: true
+#    name: shared-services
