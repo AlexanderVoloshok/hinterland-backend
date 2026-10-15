@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+from flask import jsonify
 from typing import Union
 from src.sql_utils import read_sql, read_postgis
 
@@ -46,7 +47,8 @@ class City:
             GROUP BY date, city_from
             ORDER BY date desc;
         """ % self.name)
-        return {
+
+        return jsonify({
             'current': int(current['value']),
             'min_size': int(df.loc[a, 'value']),
             'min_label': int(df.loc[a, 'name']),
@@ -54,7 +56,7 @@ class City:
             'max_label': int(df.loc[c, 'name']),
             'min_length': l['min'].to_list()[0],
             'max_length': l['max'].to_list()[0]
-        }
+        })
 
 
     def get_hinterland_dynamics(self, arrg_type: str, airline: Union[str, None] = None):
@@ -301,10 +303,13 @@ class City:
             where city = '%s'
             group by ad.airline, airls.color, airls.is_lowcost
         """ % self.name)
+        df['color'] = df['color'].fillna('')
+
         d = {}
         for _, row in df.iterrows():
             d[row['airline']] = {'color': row['color'], 'is_lowcost': row['is_lowcost']}
-        return d
+
+        return jsonify(d)
 
     @property
     def wiki_links(self):
