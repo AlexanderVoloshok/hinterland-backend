@@ -14,4 +14,4 @@ USER app
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--workers", "2", "--bind", "0.0.0.0:5000", "--access-logfile", "-", "--error-logfile", "-", "--capture-output", "flask_app:app"]
+CMD ["gunicorn", "--chdir", "/app/src",  "--workers", "2", "--bind", "0.0.0.0:5000", "--access-logfile", "-", "--error-logfile", "-", "--capture-output", "--no-control-socket", "flask_app:app"]

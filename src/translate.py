@@ -1,7 +1,7 @@
 import pandas as pd
 from psycopg2 import connect
 from googletrans import Translator
-from config import ENGINE, URI
+from src.config import ENGINE, URI
 translator = Translator()
 
 df = pd.read_sql("""

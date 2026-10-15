@@ -1,8 +1,8 @@
 import json
 from flask import Blueprint, request
-from cities.city import City, get_cities_list
-from cities import comparison
-from utils import valid_city
+from src.cities.city import City, get_cities_list
+from src.cities import comparison
+from src.utils import valid_city
 
 
 city_bp = Blueprint('cities', __name__)

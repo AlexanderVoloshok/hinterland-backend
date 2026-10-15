@@ -1,4 +1,4 @@
-from sql_utils import read_sql
+from src.sql_utils import read_sql
 
 
 SQL = """

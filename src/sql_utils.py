@@ -1,6 +1,6 @@
 import pandas as pd
 import geopandas as gpd
-from config import ENGINE
+from src.config import ENGINE
 
 def read_sql(query: str, params: tuple = ()):
     with ENGINE.connect() as conn:

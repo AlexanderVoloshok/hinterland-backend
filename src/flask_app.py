@@ -3,9 +3,9 @@ import time
 import traceback
 from flask import Flask, request, send_from_directory, jsonify
 from flask_cors import CORS
-from config import Config
-from cities.views import city_bp
-from utils import get_logger
+from src.config import Config
+from src.cities.views import city_bp
+from src.utils import get_logger
 
 
 app = Flask(__name__)

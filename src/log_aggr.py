@@ -1,6 +1,6 @@
 from pandas import DataFrame, concat
 from dateutil.parser import parse
-from config import ENGINE
+from src.config import ENGINE
 
 
 def is_date(string, fuzzy=False):

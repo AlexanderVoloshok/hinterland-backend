@@ -1,7 +1,7 @@
 import pandas as pd
 import json
 from typing import Union
-from sql_utils import read_sql, read_postgis
+from src.sql_utils import read_sql, read_postgis
 
 
 def prepare_cities_structure(table: pd.DataFrame):

@@ -1,7 +1,7 @@
 import sys
 import logging
 from functools import wraps
-from config import Config
+from src.config import Config
 
 
 class InfoFilter(logging.Filter):
