@@ -7,7 +7,7 @@ env_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.env')
 load_dotenv(env_path)
 
 URI = os.getenv('DB_URI')
-ENGINE = create_engine(URI)
+ENGINE = create_engine(URI, pool_pre_ping=True)
 
 CITIES = pd.read_sql("""
     SELECT city, country_code, airport_name_ru, ST_X(geometry) as x, ST_Y(geometry) as y FROM wikipedia.cities_available

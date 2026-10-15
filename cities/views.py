@@ -1,6 +1,7 @@
 import json
 from flask import Blueprint, request
 from cities.city import City, get_cities_list
+from cities import comparison
 from utils import valid_city
 
 
@@ -10,6 +11,11 @@ city_bp = Blueprint('cities', __name__)
 @city_bp.route("/", methods=['GET'])
 def get_available_cities():
     return get_cities_list()
+
+
+@city_bp.route("/comparison/centroid_mobility", methods=['GET'])
+def get_centroid_mobility_chart_data():
+    return comparison.get_centroid_mobility_chart_data()
 
 
 @city_bp.route("/<city>/hinterland/<report_type>", methods=['GET'])
