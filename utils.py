@@ -1,3 +1,4 @@
+import sys
 import logging
 from functools import wraps
 from config import Config
@@ -16,14 +17,14 @@ def get_logger(name):
     logger.setLevel(logging.DEBUG)
 
     # Хендлер для INFO
-    info_handler = logging.FileHandler('action.log', mode='a')
+    info_handler = logging.StreamHandler(sys.stdout)
     info_handler.setLevel(logging.INFO)
     info_handler.addFilter(InfoFilter())
     formatter = logging.Formatter('[%(name)s] %(asctime)s %(levelname)-8s %(message)s')
     info_handler.setFormatter(formatter)
 
     # Хендлер для EXCEPTION / ERROR
-    error_handler = logging.FileHandler('error.log', mode='a')
+    error_handler = logging.StreamHandler(sys.stdout)
     error_handler.setLevel(logging.ERROR)
     error_handler.addFilter(ErrorFilter())
     error_handler.setFormatter(logging.Formatter('%(asctime)s - ERROR - %(message)s'))
