@@ -3,7 +3,7 @@ import time
 import traceback
 from flask import Flask, request, send_from_directory, jsonify
 from flask_cors import CORS
-from src.config import Config
+from src.config import CONFIG
 from src.cities.views import city_bp
 from src.utils import get_logger
 
@@ -13,7 +13,7 @@ cors = CORS(app)
 
 logger = get_logger(__name__)
 
-app.register_blueprint(city_bp, url_prefix=f'{Config.APP_ROOT}/cities')
+app.register_blueprint(city_bp, url_prefix=f'{CONFIG.APP_ROOT}/cities')
 
 @app.before_request
 def reqbeg():
@@ -41,18 +41,18 @@ def handle_error(e: Exception):
     return jsonify(response), 500
 
 
-@app.route(Config.APP_ROOT)
+@app.route(CONFIG.APP_ROOT)
 def hello():
     # do your things here
     return "It works!"
 
 
-@app.route(f"{Config.APP_ROOT}/file/<file_name>", methods=['GET'])
+@app.route(f"{CONFIG.APP_ROOT}/file/<file_name>", methods=['GET'])
 def return_file(file_name: str):
-    return send_from_directory(directory=Config.UPLOAD_FOLDER, path=file_name, as_attachment=True)
+    return send_from_directory(directory=CONFIG.UPLOAD_FOLDER, path=file_name, as_attachment=True)
 
 
 if __name__ == "__main__":
-    if not os.path.exists(Config.UPLOAD_FOLDER):
-        os.mkdir(Config.UPLOAD_FOLDER)
+    if not os.path.exists(CONFIG.UPLOAD_FOLDER):
+        os.mkdir(CONFIG.UPLOAD_FOLDER)
     app.run()

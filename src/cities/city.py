@@ -3,7 +3,7 @@ import json
 from flask import jsonify
 from typing import Union
 from src.sql_utils import read_sql, read_postgis
-
+from src.config import CONFIG
 
 def prepare_cities_structure(table: pd.DataFrame):
     countries = table['country_name_ru'].unique()
@@ -21,9 +21,10 @@ def prepare_cities_structure(table: pd.DataFrame):
 
 def get_cities_list():
     table = read_sql("""
-        SELECT country_name_ru, city, country_code, airport_name_ru, ST_X(geometry) as x, ST_Y(geometry) as y FROM wikipedia.cities_available
+        SELECT country_name_ru, city, country_code, airport_name_ru, ST_X(geometry) as x, ST_Y(geometry) as y, data_collection_complete FROM wikipedia.cities_available
         ORDER BY airport_name_ru
     """)
+    CONFIG.ALLOWED_CITIES = tuple(table['city'].values)
     return prepare_cities_structure(table)
 
 

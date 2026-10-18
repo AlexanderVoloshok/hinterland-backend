@@ -10,8 +10,7 @@ URI = os.getenv('DB_URI')
 ENGINE = create_engine(URI, pool_pre_ping=True)
 
 CITIES = pd.read_sql("""
-    SELECT city, country_code, airport_name_ru, ST_X(geometry) as x, ST_Y(geometry) as y FROM wikipedia.cities_available
-    ORDER BY airport_name_ru
+    SELECT city FROM wikipedia.cities_available
 """, ENGINE)
 
 class Config:
@@ -20,4 +19,4 @@ class Config:
     UPLOAD_FOLDER = os.path.dirname(os.path.realpath(__file__)) + '/files'
     APP_ROOT = '/api_hinterlands'
 
-    
+CONFIG = Config()

@@ -1,7 +1,7 @@
 import sys
 import logging
 from functools import wraps
-from src.config import Config
+from src.config import CONFIG
 
 
 class InfoFilter(logging.Filter):
@@ -39,7 +39,7 @@ def valid_city(function):
     @wraps(function)
     def wrapped(*args, **kwargs):
         city = kwargs.get('city', '')
-        if city not in Config.ALLOWED_CITIES:
+        if city not in CONFIG.ALLOWED_CITIES:
             return "city not available", 403
         res = function(*args, **kwargs)
         return res
