@@ -30,7 +30,7 @@ def dispatch_city_report_by_type(city: str, report_type: str):
         airline = request.args.get('airline') or None
         return c.get_hinterland_dynamics(aggr_type, airline)
     elif report_type == 'map': 
-        return c.hinterland_map()
+        return c.get_hinterland_map()
     elif report_type == 'minmaxroutelength':
         return c.get_min_max_route_length_dynamics()
     elif report_type == 'centroids': 
