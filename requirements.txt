@@ -6,7 +6,7 @@ sqlalchemy==2.0.41
 python-dotenv
 pandas
 pyproj
-geopandas==0.12.2
+geopandas==1.1.4
 fiona==1.9.5
 psycopg2-binary
 openpyxl==3.0.9

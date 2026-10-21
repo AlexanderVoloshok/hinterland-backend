@@ -184,13 +184,21 @@ class City:
         return df.to_dict(orient="records")
 
 
-    def hinterland_map(self):
+    def get_hinterland_map(self):
         df = read_sql("""
             select * from wikipedia.hinterland_dynamic_for_map
             where city_from = '%s'
         """ % self.name)
         result = {str(int(row['date'])): row['json_build_object'] for index, row in df.iterrows()}
         return result
+
+
+    def get_hinterland_areals(self):
+        gdf = read_postgis("""
+            select * from wikipedia.hinterland_areals
+            where city = '%s'
+        """ % self.name, geom_col="geometry")
+        return json.loads(gdf.to_json(na="null", drop_id=True, ensure_ascii=False))
 
 
     def get_hinterland_changes(self, year_from: int, year_to: int):
@@ -201,8 +209,9 @@ class City:
         return df.to_dict(orient="records")
 
 
-    def get_hinterland_structure(self, year: int = 2024, preset_name: str = None):
-        #Для города (или страны/региона) имеется пресет - список тегов, по которым можно однозначно классифицировать города. У одного города в рамках одного пресетав не может быть двух тегов 
+    def get_hinterland_structure(self, preset_name: str = None):
+        # Для города (или страны/региона) имеется пресет - список тегов, по которым можно однозначно классифицировать города. 
+        # У одного города назначения в рамках одного пресета не может быть двух тегов 
         if not preset_name:
             preset = read_sql("select tags from wikipedia.presets where city = '%s'" % self.name)
         else:
@@ -210,31 +219,37 @@ class City:
         
         tags_str = "', '".join(preset.loc[0, 'tags'])
         q = """
-            SELECT name, count(*) as value
+            SELECT date as year, name as region, count(*) as value
             FROM (
               SELECT 
+                date,
                 (
                   SELECT tag FROM unnest(tags) AS tag
                   WHERE tag IN ('%s')
                   LIMIT 1
                 ) AS name
               FROM wikipedia.hinterlands a
-              WHERE city_from = '%s' AND date = %s
-                AND tags && ARRAY['%s']
+              WHERE city_from = '%s' AND tags && ARRAY['%s']
             ) matched
-            GROUP BY name
+            GROUP BY name, date
 
             UNION ALL
             -- Подсчёт несовпавших тегов
-            SELECT 'Прочие' AS name, count(*) as value
+            SELECT date as year, 'Прочие' AS region, count(*) as value
             FROM wikipedia.hinterlands a
-            WHERE city_from = '%s' AND date = %s
-              AND NOT (tags && ARRAY['%s'])
+            WHERE city_from = '%s' AND NOT (tags && ARRAY['%s'])
 
-            ORDER BY value DESC;        
-        """ % (tags_str, self.name, year, tags_str, self.name, year, tags_str)
+            GROUP BY region, date
+            ORDER BY year, value DESC;        
+        """ % (tags_str, self.name, tags_str, self.name, tags_str)
+
         df = read_sql(q)
-        return df.to_dict(orient="records")
+        result = df.rename(columns={"name": "region"}) \
+            .groupby(["year", "region"], as_index=False)["value"] \
+            .sum() \
+            .sort_values(["year", "region"])
+        
+        return result.to_dict(orient="records")
 
 
     def get_route_timeline(self, destinations: tuple):
@@ -284,10 +299,10 @@ class City:
             select * from wikipedia.hinterland_centroids
             where city_from = %s
         """, params=(self.name,), geom_col="geometry")
-        return json.loads(df.to_json())
+        return json.loads(df.to_json(na="null", drop_id=True, ensure_ascii=False,))
 
 
-    def destinations_list(self):
+    def get_destinations_list(self):
         table = read_sql("""select city_to as city, airport_name_ru, country_code, country_name_ru from wikipedia.hinterlands
             where city_from = '%s'
             group by city_to, airport_name_ru, country_code, country_name_ru""" % self.name)

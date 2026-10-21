@@ -36,7 +36,11 @@ def dispatch_city_report_by_type(city: str, report_type: str):
     elif report_type == 'centroids': 
         return c.centroid_migration()
     elif report_type == 'cities': 
-        return c.destinations_list()
+        return c.get_destinations_list()
+    elif report_type == 'areals': 
+        return c.get_hinterland_areals()
+    elif report_type == 'structure': 
+        return c.get_hinterland_structure()
     
     return {"status": "bad", "error": "invalid city action"}, 403
 
@@ -58,18 +62,6 @@ def get_route_length_distribution(city: str, year: str):
     
     c = City(city)
     return c.get_route_length_distribution(year)
-
-
-@city_bp.route("/<city>/hinterland/<year>/structure", methods=['GET'])
-@valid_city
-def get_hinterland_structure(city: str, year: str):
-    try:
-        year = int(year)
-    except ValueError:
-        return "invalid year", 403
-    
-    c = City(city)
-    return c.get_hinterland_structure(year)
 
 
 @city_bp.route("/<city>/routes/timeline", methods=['POST'])
