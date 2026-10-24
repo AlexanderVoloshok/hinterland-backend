@@ -21,7 +21,7 @@ def prepare_cities_structure(table: pd.DataFrame):
 
 def get_cities_list():
     table = read_sql("""
-        SELECT country_name_ru, city, country_code, airport_name_ru, ST_X(geometry) as x, ST_Y(geometry) as y, data_collection_complete FROM wikipedia.cities_available
+        SELECT country_name_ru, city, country_code, airport_name_ru, ST_X(geometry) as x, ST_Y(geometry) as y, data_collection_complete FROM wikipedia.cities_available_v2
         ORDER BY airport_name_ru
     """)
     CONFIG.ALLOWED_CITIES = tuple(table['city'].values)
@@ -35,7 +35,7 @@ class City:
 
     def get_hinterland_numbers(self):
         df = read_sql("""
-            select year, hinterland_size::integer as value, year::integer as name from wikipedia.hinterland_size_dynamics
+            select year, hinterland_size::integer as value, year::integer as name from wikipedia.hinterland_size_dynamics_v2
             where city = '%s' and season = 'summer'
             order by year desc
         """ % self.name)
@@ -43,7 +43,7 @@ class City:
         c = df['value'].idxmax()
         current = df.loc[0]
         l = read_sql("""
-            SELECT date, city_from, min(round) AS min, max(round) AS max FROM wikipedia.routes_length
+            SELECT date, city_from, min(round) AS min, max(round) AS max FROM wikipedia.routes_length_v2
             where city_from = '%s'
             GROUP BY date, city_from
             ORDER BY date desc;
@@ -100,7 +100,7 @@ class City:
                 WITH destinations_by_cost AS (
                   SELECT date, destination, bool_or(is_lowcost) AS has_true, bool_or(NOT is_lowcost) AS has_false
                   FROM (
-                  	select date_part('year'::text, date) as date, destination, is_lowcost from wikipedia.lcc_continent
+                  	select date_part('year'::text, date) as date, destination, is_lowcost from wikipedia.lcc_continent_v2
                 	where origin in (
                 		select iata from flightradar24.airports
                 		where city = '%s'
@@ -130,7 +130,7 @@ class City:
             """ % self.name
         elif arrg_type == 'continent':
             q = """
-                select date_part('year'::text, date) as date, continent, count(date) from wikipedia.lcc_continent
+                select date_part('year'::text, date) as date, continent, count(date) from wikipedia.lcc_continent_v2
 	            where origin in (
 	            	(
                     	select iata from flightradar24.airports
@@ -150,7 +150,7 @@ class City:
                   	    	when '%s' then 'domestic'
                   	    	else 'international'
                   	    end as "line_type"
-                  	    from wikipedia.lcc_continent
+                  	    from wikipedia.lcc_continent_v2
                 	    where origin in (
                 	    	(
                             	select iata from flightradar24.airports
@@ -163,7 +163,7 @@ class City:
             """ % (country['country'].values[0], self.name)
         else:
             q = """
-            select hinterland_size as value, year::text as name from wikipedia.hinterland_size_dynamics
+            select hinterland_size as value, year::text as name from wikipedia.hinterland_size_dynamics_v2
             where city = '%s' and season = 'summer'
         """ % self.name
         df = read_sql(q)
@@ -186,7 +186,7 @@ class City:
 
     def get_hinterland_map(self):
         df = read_sql("""
-            select * from wikipedia.hinterland_dynamic_for_map
+            select * from wikipedia.hinterland_dynamic_for_map_v2
             where city_from = '%s'
         """ % self.name)
         result = {str(int(row['date'])): row['json_build_object'] for index, row in df.iterrows()}
@@ -195,7 +195,7 @@ class City:
 
     def get_hinterland_areals(self):
         gdf = read_postgis("""
-            select * from wikipedia.hinterland_areals
+            select * from wikipedia.hinterland_areals_v2
             where city = '%s'
         """ % self.name, geom_col="geometry")
         return json.loads(gdf.to_json(na="null", drop_id=True, ensure_ascii=False))
@@ -228,7 +228,7 @@ class City:
                   WHERE tag IN ('%s')
                   LIMIT 1
                 ) AS name
-              FROM wikipedia.hinterlands a
+              FROM wikipedia.hinterlands_v2 a
               WHERE city_from = '%s' AND tags && ARRAY['%s']
             ) matched
             GROUP BY name, date
@@ -236,7 +236,7 @@ class City:
             UNION ALL
             -- Подсчёт несовпавших тегов
             SELECT date as year, 'Прочие' AS region, count(*) as value
-            FROM wikipedia.hinterlands a
+            FROM wikipedia.hinterlands_v2 a
             WHERE city_from = '%s' AND NOT (tags && ARRAY['%s'])
 
             GROUP BY region, date
@@ -254,7 +254,7 @@ class City:
 
     def get_route_timeline(self, destinations: tuple):
         df = read_sql("""
-            select airport_name_ru, city_to, country_code, array_agg(date) as dates from wikipedia.hinterlands
+            select airport_name_ru, city_to, country_code, array_agg(date) as dates from wikipedia.hinterlands_v2
             where city_from = '%s' and city_to in ('%s')
             group by city_to, country_code, airport_name_ru
         """ % (self.name, "', '".join(destinations)))
@@ -263,7 +263,7 @@ class City:
 
     def get_min_max_route_length_dynamics(self):
         df = read_sql("""
-            SELECT date::text, city_from, min(round) AS min, max(round) AS max FROM wikipedia.routes_length
+            SELECT date::text, city_from, min(round) AS min, max(round) AS max FROM wikipedia.routes_length_v2
             where city_from = '%s'
             GROUP BY date, city_from
             ORDER BY date;
@@ -280,7 +280,7 @@ class City:
 
     def get_route_length_distribution(self, year: int):
         df = read_sql("""
-            select * from wikipedia.routes_length
+            select * from wikipedia.routes_length_v2
             where city_from = '%s' and date = %s
         """ % (self.name, year))
 
@@ -296,14 +296,14 @@ class City:
 
     def centroid_migration(self):
         df = read_postgis("""
-            select * from wikipedia.hinterland_centroids
+            select * from wikipedia.hinterland_centroids_v2
             where city_from = %s
         """, params=(self.name,), geom_col="geometry")
         return json.loads(df.to_json(na="null", drop_id=True, ensure_ascii=False,))
 
 
     def get_destinations_list(self):
-        table = read_sql("""select city_to as city, airport_name_ru, country_code, country_name_ru from wikipedia.hinterlands
+        table = read_sql("""select city_to as city, airport_name_ru, country_code, country_name_ru from wikipedia.hinterlands_v2
             where city_from = '%s'
             group by city_to, airport_name_ru, country_code, country_name_ru""" % self.name)
         return prepare_cities_structure(table)

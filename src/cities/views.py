@@ -18,6 +18,11 @@ def get_centroid_mobility_chart_data():
     return comparison.get_centroid_mobility_chart_data()
 
 
+@city_bp.route("/comparison/hinterland_ranking/<year>", methods=['GET'])
+def get_hinterlands_sizes(year: int):
+    return comparison.get_hinterlands_sizes(int(year))
+
+
 @city_bp.route("/<city>/hinterland/<report_type>", methods=['GET'])
 @valid_city
 def dispatch_city_report_by_type(city: str, report_type: str):

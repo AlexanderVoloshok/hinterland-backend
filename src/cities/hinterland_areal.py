@@ -312,7 +312,7 @@ if __name__ == '__main__':
     countries = gpd.read_file("d:/Sasha/Кандидатская/shp/ne_10m_admin_0_countries_lakes.shp")
     countries = countries.loc[countries.geometry.notna() & ~countries.geometry.is_empty]
 
-    df = read_sql("""select * from wikipedia.hinterland_dynamic_for_map""")
+    df = read_sql("""select * from wikipedia.hinterland_dynamic_for_map_v2""")
 
     cities = []
     years = []

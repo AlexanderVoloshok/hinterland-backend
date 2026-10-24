@@ -13,7 +13,7 @@ URI = os.getenv('DB_URI')
 ENGINE = create_engine(URI, pool_pre_ping=True)
 
 CITIES = pd.read_sql("""
-    SELECT city FROM wikipedia.cities_available
+    SELECT city FROM wikipedia.cities_available_v2
 """, ENGINE)
 
 class Config:
