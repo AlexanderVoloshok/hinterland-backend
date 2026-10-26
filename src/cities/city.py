@@ -2,7 +2,7 @@ import pandas as pd
 import json
 from flask import jsonify
 from typing import Union
-from src.sql_utils import read_sql, read_postgis
+from src.sql_utils import read_sql, read_postgis, execute_sql_query
 from src.config import CONFIG
 from src.utils import timeit
 
@@ -195,12 +195,29 @@ class City:
         return result
 
 
-    def get_hinterland_areals(self):
-        gdf = read_postgis("""
-            select * from wikipedia.hinterland_areals
-            where city = '%s'
-        """ % self.name, geom_col="geometry")
-        return json.loads(gdf.to_json(na="null", drop_id=True, ensure_ascii=False))
+    def get_hinterland_areals_meta(self):
+        query = f"""
+            SELECT
+                array_agg(DISTINCT year ORDER BY year) AS years,
+                ST_XMin(ST_Extent(geometry)) AS west,
+                ST_YMin(ST_Extent(geometry)) AS south,
+                ST_XMax(ST_Extent(geometry)) AS east,
+                ST_YMax(ST_Extent(geometry)) AS north
+            FROM wikipedia.hinterland_areals
+            WHERE city = :city AND geometry IS NOT NULL AND NOT ST_IsEmpty(geometry)
+        """
+
+        row = execute_sql_query(query, {'city': self.name})
+        coordinates = [row["west"], row["south"], row["east"], row["north"]]
+
+        return {
+            "years": [int(year) for year in (row["years"] or [])],
+            "bounds": (
+                [float(value) for value in coordinates]
+                if all(value is not None for value in coordinates)
+                else None
+            ),
+        }
 
 
     def get_hinterland_changes(self, year_from: int, year_to: int):
@@ -218,6 +235,9 @@ class City:
             preset = read_sql("select tags from wikipedia.presets where city = '%s'" % self.name)
         else:
             preset = read_sql("select tags from wikipedia.presets where preset_name = '%s'" % preset_name)
+
+        if len(preset) == 0:
+            return []
         
         tags_str = "', '".join(preset.loc[0, 'tags'])
         q = """

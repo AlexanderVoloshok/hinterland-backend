@@ -43,7 +43,7 @@ def dispatch_city_report_by_type(city: str, report_type: str):
     elif report_type == 'cities': 
         return c.get_destinations_list()
     elif report_type == 'areals': 
-        return c.get_hinterland_areals()
+        return c.get_hinterland_areals_meta()
     elif report_type == 'structure': 
         return c.get_hinterland_structure()
     

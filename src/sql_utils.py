@@ -1,5 +1,6 @@
 import pandas as pd
 import geopandas as gpd
+from sqlalchemy import text
 from src.config import ENGINE
 
 def read_sql(query: str, params: tuple = ()):
@@ -27,11 +28,10 @@ def read_postgis(query: str, params: tuple = (), **kwargs):
                 conn.close()
 
 
-def execute_sql_query(query):
+def execute_sql_query(query, params=None):
     with ENGINE.begin() as conn:
         try:
-           result = conn.execute(query)
-           return result
+            return conn.execute(text(query), params or {},).mappings().one()
         except Exception as e:
             raise e
         finally:
