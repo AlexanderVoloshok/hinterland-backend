@@ -19,6 +19,14 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  pg_tileserv:
+    image: pramsey/pg_tileserv:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DB_URI}
+    ports:
+      - "127.0.0.1:7800:7800"
+
 #networks:
 #  shared:
 #    external: true
