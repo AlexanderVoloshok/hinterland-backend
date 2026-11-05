@@ -9,7 +9,19 @@ from shapely import make_valid
 from pyproj import Geod, CRS, Transformer
 
 from src.config import ENGINE
-from src.sql_utils import read_sql
+from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import JSONB
+
+PARAMETERS = {
+    'point_buffer_km': 400,
+    'edge_buffer_km': 300,
+    'smoothing_km': 100,
+    'step_km': 100,
+    'max_edge_km': 1000,
+}
+LAND_PATH = 'd:/Sasha/Кандидатская/shp/ne_10m_admin_0_countries_lakes.shp'
+SOURCE_VIEW = 'wikipedia.hinterland_dynamic_for_map'
+
 
 
 def read_hinterland_points(value):
@@ -252,82 +264,150 @@ def calculate_polygon(points, land, point_buffer_km=400, edge_buffer_km=300,
     return result
 
 
-def calculate_areals(city, years, data, max_edge_km=None):
-    """Читает SQL один раз и фильтрует город и список years.
+def _get_city_ids(conn, names):
+    """A name-keyed input cannot distinguish homonymous cities: don't guess."""
+    rows = conn.execute(text("""
+        SELECT id, name FROM wikipedia.cities WHERE name = ANY(:names)
+    """), {'names': list(names)}).mappings().all()
+    city_ids = {}
+    for row in rows:
+        if row['name'] in city_ids:
+            raise ValueError(f"Название {row['name']!r} неоднозначно. Для таких городов нужен словарь по city_id.")
+        city_ids[row['name']] = int(row['id'])
+    missing = set(names) - city_ids.keys()
+    if missing:
+        raise ValueError(f'Города отсутствуют в cities: {sorted(missing)}')
+    return city_ids
 
-    Каждый год рассчитывается отдельно. Наложения ареалов темнее.
-    polygon_alpha и point_alpha задают непрозрачность каждого среза.
 
-    extent: (xmin, xmax, ymin, ymax) в map_crs. По умолчанию — охват точек
-    и вычисленных полигонов с отступом. PNG/SVG определяются расширением файла.
+def get_missing_years():
+    """Return {city_name: [years]} for source slices absent from hinterland_areals.
+
+    One target slice may contain multiple Polygon rows. Existing slices count
+    as present regardless of their parameters or number of parts.
     """
-    
-    export_layers = []
+    with ENGINE.connect() as conn:
+        # Keep this query light: do not retrieve the GeoJSON payload yet.
+        source = pd.read_sql_query(text(f"""
+            SELECT DISTINCT city_from AS city, date::integer AS year
+            FROM {SOURCE_VIEW}
+            WHERE city_from IS NOT NULL AND date IS NOT NULL
+            ORDER BY city, year
+        """), conn)
+        if source.empty:
+            return {}
+        city_ids = _get_city_ids(conn, source['city'].unique())
+        saved = pd.read_sql_query(text("""
+            SELECT DISTINCT city_id, year FROM wikipedia.hinterland_areals
+        """), conn)
+    existing = set(saved.itertuples(index=False, name=None))
+    missing = {}
+    for row in source.itertuples(index=False):
+        if (city_ids[row.city], int(row.year)) not in existing:
+            missing.setdefault(row.city, []).append(int(row.year))
+    return missing
+
+
+def calculate_areals(city, years, data, land, city_id, save_parameters=True):
+    """Calculate selected years, replacing each successfully built slice atomically."""
+    saved = 0
     for year in years:
         rows = data.loc[data['date'] == year]
-        if len(rows) == 0 or year >= 2006:
+        if len(rows) != 1:
+            raise ValueError(f'{city}/{year}: ожидалась одна строка GeoJSON, получено {len(rows)}')
+        points = read_hinterland_points(rows.iloc[0]['json_build_object'])
+        polygon = calculate_polygon(points=points, land=land, **PARAMETERS)
+        if polygon is None or polygon.empty:
+            print(f'{city}, {year}: пустой результат, запись пропущена')
             continue
+        polygon = polygon.to_crs(4326).explode(index_parts=False, ignore_index=True)
+        if (polygon.geometry.isna().any() or polygon.geometry.is_empty.any()
+                or not polygon.geometry.is_valid.all() or not polygon.geom_type.eq('Polygon').all()):
+            raise ValueError(f'{city}/{year}: некорректные полигоны')
+        polygon['city_id'] = city_id
+        polygon['city'] = city
+        polygon['year'] = int(year)
+        columns = ['city_id', 'city', 'year', 'geometry']
+        if save_parameters:
+            polygon['parameters_json'] = json.dumps(PARAMETERS, ensure_ascii=False, allow_nan=False)
+            columns.append('parameters_json')
+        polygon = polygon[columns]
+        with ENGINE.begin() as conn:
+            conn.execute(text("""
+                DELETE FROM wikipedia.hinterland_areals
+                WHERE city_id = :city_id AND year = :year
+            """), {'city_id': city_id, 'year': int(year)})
+            polygon.to_postgis('hinterland_areals', conn, schema='wikipedia',
+                               if_exists='append', index=False,
+                               dtype={'parameters_json': JSONB()} if save_parameters else None)
+        saved += 1
+        print(f'{city} (id={city_id}), {year}: сохранено полигонов {len(polygon)}')
+    
+    return saved
 
-        row = rows.iloc[0]
-        points = read_hinterland_points(row['json_build_object'])
-        polygon = calculate_polygon(points=points.copy(), land=countries, max_edge_km=max_edge_km)
 
-        if polygon is not None:           
-            if (polygon.geometry.isna().any() or polygon.geometry.is_empty.any()
-                    or not polygon.geometry.is_valid.all()
-                    or not polygon.geom_type.isin(['Polygon', 'MultiPolygon']).all()):
-                print(f'{year}: вычисленный слой содержит некорректные полигоны')
-            
-            if not polygon.empty:
-                export_polygon = polygon.to_crs("EPSG:4326").copy()
-                export_polygon["city_id"] = 1
-                export_polygon["city"] = city
-                export_polygon["year"] = int(year)
-                export_polygon["parameters_json"] = {
-                    'max_edge_km': max_edge_km,
-                    'point_buffer_km': 400, 
-                    'edge_buffer_km':300,
-                    'smoothing_km':100, 
-                    'step_km':100
-                }
+def run_areals(cities_years=None):
+    """Nonempty {city: [years]} selects slices; None/{} recalculates everything.
 
-                export_layers.append(export_polygon[["city_id", "city", "year", "geometry", "parameters_json"]])              
+    IMPORTANT: get_missing_years() returns {} when nothing is missing. Check it
+    before calling run_areals(), otherwise {} deliberately starts a full rebuild.
+    Parameters are saved in JSON/JSONB/text columns; a legacy numeric column
+    is left unwritten. The script does not alter the table schema. Existing bad city_id assignments are not fixed.
+    """
+    selected = cities_years or {}
+    if selected:
+        selected = {city: sorted(set(int(year) for year in years))
+                    for city, years in selected.items() if years}
+        if not selected:
+            print('В переданном словаре нет лет для расчёта')
+            return 0
+        
+    query = f'SELECT * FROM {SOURCE_VIEW}'
+    params = {}
+    if selected:
+        query += ' WHERE city_from = ANY(:cities)'
+        params['cities'] = list(selected)
 
-    if len(export_layers) > 0:
-        all_areals = gpd.GeoDataFrame(
-            pd.concat(export_layers, ignore_index=True),
-            geometry="geometry",
-            crs="EPSG:4326",
-        )
+    with ENGINE.connect() as conn:
+        data = pd.read_sql_query(text(query), conn, params=params)
+        if data.empty:
+            print('Исходных данных нет')
+            return 0
+        
+        data['date'] = pd.to_numeric(data['date'], errors='raise')
+        city_ids = _get_city_ids(conn, set(selected) if selected else data['city_from'].dropna().unique())
+        parameter_type = conn.execute(text("""
+            SELECT data_type FROM information_schema.columns
+            WHERE table_schema = 'wikipedia' AND table_name = 'hinterland_areals'
+              AND column_name = 'parameters_json'
+        """)).scalar()
+        save_parameters = parameter_type in ('json', 'jsonb', 'text', 'character varying')
+        if not save_parameters:
+            print('parameters_json не JSON/text: сохраняем геометрию без параметров')
 
-        #TODO: параметры алгоритма сделать словарём или датаклассом в начале кода
-        #TODO: удалять предыдущие версии ареалов
-
-        all_areals.to_postgis('hinterland_areals', ENGINE, schema="wikipedia", if_exists='append', index=False)
-
+    if not selected:
+        selected = {city: sorted(int(year) for year in rows['date'].unique())
+                    for city, rows in data.dropna(subset=['city_from', 'date']).groupby('city_from')}
+        
+    land = gpd.read_file(LAND_PATH).to_crs(4326)
+    land = land.loc[land.geometry.notna() & ~land.geometry.is_empty]
+    saved = 0
+    for city, years in selected.items():
+        city_data = data.loc[data['city_from'] == city]
+        saved += calculate_areals(city, years, city_data, land, city_ids[city], save_parameters)
+    
+    return saved
 
 
 if __name__ == '__main__':
+    # Default: calculate missing slices only. Don't pass {} to run_areals here:
+    # {} means a full recalculation, rather than "nothing is missing".
+    missing = get_missing_years()
+    if missing:
+        print(missing)
+        run_areals(missing)
+    else:
+        print('Все срезы уже рассчитаны')
 
-    countries = gpd.read_file("d:/Sasha/Кандидатская/shp/ne_10m_admin_0_countries_lakes.shp")
-    countries = countries.loc[countries.geometry.notna() & ~countries.geometry.is_empty]
-
-    df = read_sql("""select * from wikipedia.hinterland_dynamic_for_map""")
-
-    cities = []
-    years = []
-
-    if len(cities) == 0:
-        cities = df['city_from'].unique()
-    
-    for city in cities:
-        city_rows = df.query("city_from == '%s'" % city).copy()
-        city_rows['date'] = pd.to_numeric(city_rows['date'], errors='raise')
-
-        if len(years) == 0:
-            city_years = [int(d) for d in city_rows["date"].values]
-
-        selected = city_rows.loc[city_rows['date'].isin(city_years)]
-        
-        calculate_areals(city, city_years, data=selected, max_edge_km=1000)
-        print(city)
+    # Full rebuild: replace the block above with run_areals({}).
+    # Selected slices: run_areals({'Moscow': [2024, 2025]}).

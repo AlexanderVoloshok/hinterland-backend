@@ -334,10 +334,10 @@ class City:
     def airlines_list(self):
         df = read_sql("""
             select ad.airline, airls.color, airls.is_lowcost FROM wikipedia.airlines_and_destinations ad
-            join (
+            left join (
             	SELECT airport_name, iata, city FROM flightradar24.airports WHERE link IS NOT NULL
             ) sample on ad.origin = sample.iata
-            join flightradar24.airlines airls on ad.airline = airls.airline
+            left join flightradar24.airlines airls on ad.airline = airls.airline
             where city = '%s'
             group by ad.airline, airls.color, airls.is_lowcost
         """ % self.name)
