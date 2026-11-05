@@ -285,9 +285,19 @@ class City:
 
     def get_min_max_route_length_dynamics(self):
         df = read_sql("""
-            SELECT date::text, city_from, min(round) AS min, max(round) AS max FROM wikipedia.routes_length
-            where city_from = '%s'
-            GROUP BY date, city_from
+            WITH routes AS (
+                SELECT date, city_from, city_to, round,
+                    MIN(round) OVER (PARTITION BY date, city_from) AS min_length,
+                    MAX(round) OVER (PARTITION BY date, city_from) AS max_length
+                FROM wikipedia.routes_length
+                WHERE city_from = '%s'
+            )
+            SELECT date::text, city_from, min_length AS min,
+                STRING_AGG(DISTINCT city_to, ', ' ORDER BY city_to) FILTER (WHERE round = min_length) AS min_cities,
+                max_length AS max,
+                STRING_AGG(DISTINCT city_to, ', ' ORDER BY city_to) FILTER (WHERE round = max_length) AS max_cities
+            FROM routes
+            GROUP BY date, city_from, min_length, max_length
             ORDER BY date;
         """ % self.name)
         results = [
@@ -295,8 +305,8 @@ class City:
             {"name": "Кратчайший маршрут", "series": []}
         ]
         for index, row in df.iterrows():
-            results[0]['series'].append({'name': row['date'], 'value': row['max']})
-            results[1]['series'].append({'name': row['date'], 'value': row['min']})
+            results[0]['series'].append({'name': row['date'], 'value': row['max'], 'city_label': row['max_cities']})
+            results[1]['series'].append({'name': row['date'], 'value': row['min'], 'city_label': row['min_cities']})
         return results
 
 
