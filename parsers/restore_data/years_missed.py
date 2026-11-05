@@ -28,8 +28,7 @@ def _codes(airports):
 def _query_links(airports, years=None, missing_only=False, match_by='date'):
     """The registry is the only source of expected snapshots."""
 
-    conditions = ['l.link IS NOT NULL', "btrim(l.link) <> ''",
-                  'l.date IS NOT NULL', 'l.iata IS NOT NULL']
+    conditions = ['l.link IS NOT NULL', "btrim(l.link) <> ''", 'l.date IS NOT NULL', 'l.iata IS NOT NULL']
     params = {}
     if _codes(airports):
         conditions.append('l.iata IN :airports')
@@ -59,7 +58,9 @@ def _query_links(airports, years=None, missing_only=False, match_by='date'):
     for key in params:
         query = query.bindparams(bindparam(key, expanding=True))
 
-    return read_sql(query, params=params)
+    df =  read_sql(query, params=params)
+    raw_files = [f.replace(".xlsx", "") for f in os.listdir('d:/Sasha/Самолёты/Flightradar24 project/parsers/wikipedia/raw files')]
+    return df.query("iata not in @raw_files")
 
 
 def _saved_paths(iata):
@@ -111,6 +112,7 @@ def get_missing_links(airports, source='db', match_by='date', include_staged=Tru
             dates = pd.to_datetime(saved['date'], errors='raise').dropna()
             existing = {_date_key(date, match_by) for date in dates}
             keep.loc[group.index] = [_date_key(date, match_by) not in existing for date in group['date']]
+
         links = links.loc[keep]
 
     return links.reset_index(drop=True)
@@ -200,7 +202,7 @@ def _save_restored(iata, restored):
 
     return str(path)
 
-
+#TODO: проверить парсер - обработать замечание. может быть колонка с авиакомпаниями, но не быть направлений
 def parse_selected_links(data, manual_accept=False, register_links=False):
     """Parse supplied snapshots, save accepted results and report empty pages.
 
@@ -244,7 +246,7 @@ def parse_selected_links(data, manual_accept=False, register_links=False):
                     frame['date'] = entry['date']
                     frame['origin'] = iata
                     if manual_accept:
-                        print(frame.to_string(index=False))
+                        print(frame)
                         if input(f"Сохранить {iata} за {entry['date']}? [y/N] ").strip().lower() != 'y':
                             report['rejected'].append(entry)
                             continue
@@ -284,12 +286,10 @@ def restore_missing_data(airports, match_only=False, manual_accept=True, source=
     """
     links = get_missing_links(airports, source, match_by, include_staged)
     data = _as_data(links)
-    raw_files = [f.replace(".xlsx", "") for f in os.listdir('d:/Sasha/Самолёты/Flightradar24 project/parsers/wikipedia/raw files')]
     for iata, items in data.items():
-        if iata not in raw_files:
-            print(f"{iata}: {len(items)} ссылок без данных")
-            for item in items:
-                print(f"  {item['date']} | {item['link']}")
+        print(f"{iata}: {len(items)} ссылок без данных")
+        for item in items:
+            print(f"  {item['date']} | {item['link']}")
 
     if match_only:
         return data

@@ -8,6 +8,7 @@ from dateutil import parser
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+from parsers.replacement import replacement_airports, cargo_airlines
 from src.sql_utils import execute_delete_query
 from parsers.utils import skip
 from parsers.wikipedia.custom_func import *
@@ -48,6 +49,7 @@ class WikiAirportPage():
         self.charter_index = None
         self._reflected = True
 
+    
     def mark_seasonal_flights(self, df: pd.DataFrame) -> pd.DataFrame:
         """Записывает в колонку признак сезонности направления
 
@@ -123,7 +125,7 @@ class WikiAirportPage():
 
         df['destination'] = df['destination'].apply(lambda x: unify_symbols(x))
         df = self.remove_unnessesary_flights(df)
-        df = df.replace({"destination": replacement_dict})
+        df = df.replace({"destination": replacement_airports})
         
         #if destination contains number or is empty: remove
         df['sign'] = df['destination'].apply(lambda x: not bool(x.strip()) if isinstance(x, str) else True)
