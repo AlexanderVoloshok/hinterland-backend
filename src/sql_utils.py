@@ -1,7 +1,9 @@
 import pandas as pd
 import geopandas as gpd
 from sqlalchemy import text
-from src.config import ENGINE
+from psycopg2 import connect
+from src.config import CONFIG, ENGINE
+
 
 def read_sql(query: str, params: tuple = ()):
     with ENGINE.connect() as conn:
@@ -57,3 +59,20 @@ def execute_sql_and_commit(queries, payload: dict = None):
             finally:
                 if conn:
                     conn.close()
+
+
+def execute_delete_query(query: str):
+    conn = connect(CONFIG.DB_URI)
+    with conn:
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            conn.commit()
+    c = cursor.rowcount
+    cursor.close()
+    conn.close()
+    response = {
+        'status': 'ok', 
+        'message': f"{c} rows were deleted",
+        'count': c
+    }
+    return response

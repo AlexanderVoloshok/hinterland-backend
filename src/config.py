@@ -19,7 +19,9 @@ CITIES = pd.read_sql("""
 class Config:
     DB_URI = URI
     ALLOWED_CITIES = tuple(CITIES['city'].values)
-    UPLOAD_FOLDER = os.path.dirname(os.path.realpath(__file__)) + '/files'
     APP_ROOT = '/api_hinterlands'
+    DATA_SAVE_FOLDER = PROJECT_ROOT / 'data'
+    UPLOAD_FOLDER = os.path.dirname(os.path.realpath(__file__)) + '/files'
+    FOLDER = PROJECT_ROOT
 
 CONFIG = Config()
