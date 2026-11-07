@@ -352,6 +352,7 @@ class City:
             group by ad.airline, airls.color, airls.is_lowcost
         """ % self.name)
         df['color'] = df['color'].fillna('')
+        df['is_lowcost'] = df['is_lowcost'].fillna('')
 
         d = {}
         for _, row in df.iterrows():
