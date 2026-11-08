@@ -23,5 +23,6 @@ class Config:
     DATA_SAVE_FOLDER = PROJECT_ROOT / 'data'
     UPLOAD_FOLDER = os.path.dirname(os.path.realpath(__file__)) + '/files'
     FOLDER = PROJECT_ROOT
+    LEGACY_PARSERS_ROOT = 'd:/Sasha/Самолёты/Flightradar24 project'
 
 CONFIG = Config()

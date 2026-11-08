@@ -20,9 +20,9 @@ def remove_cargo_airlines():
     #TODO: достаточно просто обновить файл в completed
     for code in airports:
         df = pd.read_sql(f"select * from wikipedia.airlines_and_destinations where origin = '{code}'", ENGINE)
-        if os.path.exists(f"{CONFIG.FOLDER}/parsers/wikipedia/completed/{code}.xlsx"):
-            df.to_excel(f"{CONFIG.FOLDER}/parsers/wikipedia/completed/{code}.xlsx")
-        elif os.path.exists(f"{CONFIG.FOLDER}/parsers/wikipedia/completed/{code}_new.xlsx"):
-            df.to_excel(f"{CONFIG.FOLDER}/parsers/wikipedia/completed/{code}_new.xlsx")
+        if os.path.exists(f"{CONFIG.LEGACY_PARSERS_ROOT}/parsers/wikipedia/completed/{code}.xlsx"):
+            df.to_excel(f"{CONFIG.LEGACY_PARSERS_ROOT}/parsers/wikipedia/completed/{code}.xlsx")
+        elif os.path.exists(f"{CONFIG.LEGACY_PARSERS_ROOT}/parsers/wikipedia/completed/{code}_new.xlsx"):
+            df.to_excel(f"{CONFIG.LEGACY_PARSERS_ROOT}/parsers/wikipedia/completed/{code}_new.xlsx")
         else:
             print(f'work on {code} is not finished yet')
