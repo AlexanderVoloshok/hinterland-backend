@@ -31,7 +31,7 @@ class WikiAirportPage():
         self.airline_index = 0
         self.destionation_index = 1
         self._reflected = False
-        self.fallback_fns = (pittsburgh_legacy,)
+        self.fallback_fns = (pittsburgh_legacy, atl)
 
 
     def reflect(self):
@@ -136,8 +136,7 @@ class WikiAirportPage():
         df = df.query("sign == False")
 
         #remove empty deastinations
-        
-        black_list = ('official site', 'requires Adobe Flash', 'Official website', 'English', 'Russian', 'official website')
+        black_list = ('official site', 'requires Adobe Flash', 'Official website', 'English', 'Russian', 'French', 'Spanish', 'official website', 'UTC')
         df = df.query("destination not in @black_list")
         return df.drop(columns=['sign'])
 
@@ -212,6 +211,7 @@ class WikiAirportPage():
         df['remark'] = 'Charter'
         return df          
 
+    
     def get_flights(self, custom_fn=None):
         
         if not self._reflected:
@@ -227,7 +227,12 @@ class WikiAirportPage():
                 result = self.get_passenger_flights(custom_fn=fallback)
                 if not result.empty:
                     break
-        return result.drop_duplicates().reset_index(drop=True)
+        
+        result = result.drop_duplicates().reset_index(drop=True)
+        if len(result) <=2:
+            return pd.DataFrame()
+        
+        return result
 
 
 class WikiAirport():

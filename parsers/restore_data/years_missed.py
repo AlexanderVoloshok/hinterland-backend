@@ -1,6 +1,7 @@
 import os
 import re
 import tempfile
+import typing as ty
 from html import unescape
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -8,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 import pandas as pd
 from sqlalchemy import bindparam, text
 from parsers.wikipedia.wiki_pages import WikiAirportPage
+from src.config import CONFIG
 from src.sql_utils import read_sql, execute_sql_and_commit, read_sql
 from parsers.utils import get_driver
 
@@ -25,10 +27,10 @@ def _codes(airports):
     return sorted({str(code).strip().upper() for code in airports})
 
 
-def _query_links(airports, years=None, missing_only=False, match_by='date'):
+def _query_links(airports: ty.Union[list, None], years=None, missing_only=False, match_by='date'):
     """The registry is the only source of expected snapshots."""
 
-    conditions = ['l.link IS NOT NULL', "btrim(l.link) <> ''", 'l.date IS NOT NULL', 'l.iata IS NOT NULL']
+    conditions = ['l.link IS NOT NULL', "btrim(l.link) <> ''", 'l.iata IS NOT NULL']
     params = {}
     if _codes(airports):
         conditions.append('l.iata IN :airports')
@@ -59,7 +61,7 @@ def _query_links(airports, years=None, missing_only=False, match_by='date'):
         query = query.bindparams(bindparam(key, expanding=True))
 
     df =  read_sql(query, params=params)
-    raw_files = [f.replace(".xlsx", "") for f in os.listdir('d:/Sasha/Самолёты/Flightradar24 project/parsers/wikipedia/raw files')]
+    raw_files = [f.replace(".xlsx", "") for f in os.listdir(f'{CONFIG.LEGACY_PARSERS_ROOT}/parsers/wikipedia/raw files')]
     return df.query("iata not in @raw_files")
 
 
@@ -90,7 +92,7 @@ def _date_key(value, match_by):
     return value.year if match_by == 'year' else value.date()
 
 
-def get_missing_links(airports, source='db', match_by='date', include_staged=True):
+def get_missing_links(airports: ty.Union[list, None], source='db', match_by='date', include_staged=True):
     """Return registry links missing in DB or Excel.
 
     date: compare exact calendar dates; year: any snapshot in that year suffices.

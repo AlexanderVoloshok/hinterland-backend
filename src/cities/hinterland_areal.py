@@ -272,7 +272,8 @@ def _get_city_ids(conn, names):
     city_ids = {}
     for row in rows:
         if row['name'] in city_ids:
-            raise ValueError(f"Название {row['name']!r} неоднозначно. Для таких городов нужен словарь по city_id.")
+            print(f"Название {row['name']!r} неоднозначно. Для таких городов нужен словарь по city_id.")
+            continue
         city_ids[row['name']] = int(row['id'])
     missing = set(names) - city_ids.keys()
     if missing:
@@ -281,30 +282,28 @@ def _get_city_ids(conn, names):
 
 
 def get_missing_years():
-    """Return {city_name: [years]} for source slices absent from hinterland_areals.
+    """Return source city/year pairs without a saved areal.
 
-    One target slice may contain multiple Polygon rows. Existing slices count
-    as present regardless of their parameters or number of parts.
+    Match the stored city name because older areals may have outdated city IDs.
+    Multiple polygon rows for one city/year count as one saved slice.
     """
     with ENGINE.connect() as conn:
-        # Keep this query light: do not retrieve the GeoJSON payload yet.
-        source = pd.read_sql_query(text(f"""
-            SELECT DISTINCT city_from AS city, date::integer AS year
-            FROM {SOURCE_VIEW}
-            WHERE city_from IS NOT NULL AND date IS NOT NULL
+        rows = conn.execute(text(f"""
+            SELECT DISTINCT src.city_from AS city, src.date::integer AS year
+            FROM {SOURCE_VIEW} AS src
+            WHERE src.city_from IS NOT NULL AND src.date IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM wikipedia.hinterland_areals AS saved
+                  WHERE saved.city = src.city_from
+                    AND saved.year::integer = src.date::integer
+              )
             ORDER BY city, year
-        """), conn)
-        if source.empty:
-            return {}
-        city_ids = _get_city_ids(conn, source['city'].unique())
-        saved = pd.read_sql_query(text("""
-            SELECT DISTINCT city_id, year FROM wikipedia.hinterland_areals
-        """), conn)
-    existing = set(saved.itertuples(index=False, name=None))
+        """)).mappings().all()
+
     missing = {}
-    for row in source.itertuples(index=False):
-        if (city_ids[row.city], int(row.year)) not in existing:
-            missing.setdefault(row.city, []).append(int(row.year))
+    for row in rows:
+        missing.setdefault(row['city'], []).append(row['year'])
     return missing
 
 

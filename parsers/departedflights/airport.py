@@ -345,8 +345,6 @@ def parse_departedflights_url(url: str) -> pd.DataFrame:
             ):
                 continue
 
-            report(airline, f"Неизвестный формат сноски; основные направления сохранены: {note}")
-
     if not rows:
         raise ValueError(f"Блоки авиакомпаний не найдены: {url}")
 
@@ -474,7 +472,16 @@ if __name__ == '__main__':
         "https://www.departedflights.com/83Iintro.html",
         "https://www.departedflights.com/89Iintro.html",
         "https://www.departedflights.com/96Iintro.html"
+        'https://www.departedflights.com/74intro.html',
+        'https://www.departedflights.com/79intro.html',
+        'https://www.departedflights.com/81intro.html',
+        'https://www.departedflights.com/83intro.html',
+        'https://www.departedflights.com/85intro.html',
+        'https://www.departedflights.com/89intro.html',
+        'https://www.departedflights.com/91intro.html',
+        'https://www.departedflights.com/91intro.html',
+        'https://www.departedflights.com/99intro.html',
     ]
 
     links_df, errors_df = parse_editions(urls, output_dir=CONFIG.DATA_SAVE_FOLDER)
-    update_links(links_df)
+    #update_links(links_df)
