@@ -20,7 +20,15 @@ def get_centroid_mobility_chart_data():
 
 @city_bp.route("/comparison/hinterland_ranking/<year>", methods=['GET'])
 def get_hinterlands_sizes(year: int):
-    return comparison.get_hinterlands_sizes(int(year))
+    region = request.args.get('region')
+    order_by = request.args.get('orderBy')
+    direction = request.args.get('direction')
+    if region is not None and region not in comparison.RANKING_REGIONS:
+        raise ValueError("Invalid region")
+    if order_by not in comparison.RANKING_COLUMNS or direction not in {"asc", "desc"}:
+        raise ValueError("Invalid ranking sort")
+    
+    return comparison.get_hinterlands_sizes(year=int(year), region=region, order_by=order_by, direction=direction)
 
 
 @city_bp.route("/<city>/hinterland/<report_type>", methods=['GET'])
