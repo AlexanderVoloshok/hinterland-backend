@@ -9,11 +9,10 @@ from urllib.parse import parse_qs, urlparse
 import pandas as pd
 from sqlalchemy import bindparam, text
 from parsers.wikipedia.wiki_pages import WikiAirportPage
+from parsers.wikipedia.wiki_utils import _WikiHTML, _WikiNode, remove_link
 from src.config import CONFIG
 from src.sql_utils import read_sql, execute_sql_and_commit, read_sql
 from parsers.utils import get_driver
-
-#TODO: на некоторых находимых страницах нужные разделы всё-таки есть
 
 driver = None
 COLUMNS = ['airline', 'destination', 'remark', 'date', 'origin']
@@ -166,21 +165,37 @@ def _empty_result_status(browser, link):
     if not expected or normalize(expected) not in normalize(actual):
         return 'errors', 'Загружена другая страница или не удалось проверить заголовок'
     
-    headings = re.findall(r'<h[1-6]\b[^>]*>(.*?)</h[1-6]\s*>', source, re.I | re.S)
+    headings = {}
+    for node in _WikiHTML(source).root.walk():
+        if node.tag in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
+            level = int(node.tag[1])
+            headings = {key: value for key, value in headings.items() if key < level}
+            headings[level] = normalize(node.text())
+            continue
 
-    for heading in headings:
-        heading = unescape(re.sub(r'<[^>]+>', ' ', heading))
-        if (re.search(r'destinations?|airlines?|passenger', heading, re.I)
-                and not re.search(r'former|cargo|freight|lounges?', heading, re.I)):
-            return 'needs_review', 'Раздел направлений есть, но парсер вернул 0 строк'
-        
-    cells = re.findall(r'<th\b[^>]*>(.*?)</th>', source, re.I | re.S)
-    labels = [normalize(unescape(re.sub(r'<[^>]+>', ' ', cell))) for cell in cells]
+        section = ' / '.join(headings.values())
+        if re.search(r'\b(cargo|freight|former|defunct|lounges?)\b', section):
+            continue
 
-    if any(re.search(r'\bairlines?\b', cell) for cell in labels):
-        return 'needs_review', 'Есть таблица авиакомпаний; требуется проверка парсера'
-    
-    return 'delete_candidates', 'Не найден раздел или заголовки таблицы направлений'
+        if node.tag == 'tr':
+            cells = [cell for cell in node.children
+                     if isinstance(cell, _WikiNode) and cell.tag in ('th', 'td')]
+            labels = {normalize(remove_link(cell.text())) for cell in cells}
+            if labels & {'airline', 'airlines'} and labels & {'destination', 'destinations'}:
+                return 'needs_review', 'Есть таблица авиакомпаний и направлений, но парсер вернул 0 строк'
+
+        if node.tag == 'li' and re.search(r'\b(airlines?|destinations?|passenger|charters?)\b', section):
+            # Check the item's own text. Nested lists are visited separately.
+            own_text = ''.join(
+                child if isinstance(child, str) else child.text()
+                for child in node.children
+                if isinstance(child, str) or child.tag not in ('ul', 'ol')
+            )
+            if re.fullmatch(r'[^()]+?\s*\(\s*[^()\s][\s\S]*\)\s*', remove_link(own_text)):
+                return 'needs_review', 'Есть список маршрутов, но парсер вернул 0 строк'
+
+    return 'delete_candidates', 'Нет таблицы авиакомпаний и направлений или списка маршрутов'
+
 
 
 def _save_restored(iata, restored):
@@ -204,7 +219,7 @@ def _save_restored(iata, restored):
 
     return str(path)
 
-#TODO: проверить парсер - обработать замечание. может быть колонка с авиакомпаниями, но не быть направлений
+
 def parse_selected_links(data, manual_accept=False, register_links=False):
     """Parse supplied snapshots, save accepted results and report empty pages.
 

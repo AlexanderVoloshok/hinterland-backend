@@ -264,3 +264,77 @@ def pittsburgh_legacy(driver):
             add(prefix, routes)
 
     return airlines, destinations
+
+
+def _airline_destination_list_pairs(source):
+    """Read own text of each passenger list item, including nested operators."""
+
+    def own_text(node):
+        if isinstance(node, str):
+            return node
+        if node.tag in ('ul', 'ol', 'sup', 'script', 'style'):
+            return ''
+        classes = set(node.attrs.get('class', '').split())
+        if classes.intersection({'reference', 'mw-editsection', 'sortkey'}):
+            return ''
+        if node.tag == 'a' and 'external' in classes:
+            return ''
+        if node.tag == 'br':
+            return ' '
+        return ''.join(own_text(child) for child in node.children)
+
+    def preserve_note(match):
+        note = match.group(1)
+        if re.search(r'\b(seasonal|charter|hajj|begins?|starts?|ends?|resumes?|suspended|from)\b', note, re.I):
+            return '(' + note + ')'
+        return ''
+
+    pairs = []
+    headings = {}
+    root = _WikiHTML(source).root
+    for node in root.walk():
+        if re.fullmatch(r'h[1-6]', node.tag):
+            level = int(node.tag[1])
+            headings = {k: v for k, v in headings.items() if k < level}
+            headings[level] = re.sub(r'\s+', ' ', node.text()).strip()
+            continue
+        if node.tag != 'li':
+            continue
+        if not any(re.search(r'\bairlines?\b', title, re.I) and
+                   re.search(r'\bdestinations?\b', title, re.I)
+                   for title in headings.values()):
+            continue
+        section = ' / '.join(headings.values())
+        if re.search(r'\b(cargo|freight|former|defunct)\b', section, re.I):
+            continue
+        parent = node.parent
+        while parent is not None and parent.tag != 'table':
+            parent = parent.parent
+        if parent is not None:
+            continue  # Tables (including nested operator lists) have their own parser.
+        value = re.sub(r'\s+', ' ', own_text(node)).strip()
+        airline, separator, routes = value.partition('(')
+        if not separator:
+            continue  # A parent airline can contain only a nested operator list.
+        airline = airline.strip()
+        routes = routes.strip()
+        if not routes.endswith(')'):
+            continue  # This handler expects a complete outer destination list.
+        routes = re.sub(r'\[([^\]]*)\]', preserve_note, routes[:-1]).strip()
+        if airline and routes:
+            pairs.append((airline, routes))
+    return pairs
+
+
+def has_airline_destination_lists(source):
+    """Recognize a passenger destination section rendered as nested lists."""
+    # Pittsburgh has gate annotations and a dedicated legacy handler.
+    return not has_legacy_concourse_layout(source) and bool(_airline_destination_list_pairs(source))
+
+
+def airline_destination_lists(driver):
+    """Belgrade/Prague legacy lists: return (airlines, destinations)."""
+    if has_legacy_concourse_layout(driver.page_source):
+        return [], []
+    pairs = _airline_destination_list_pairs(driver.page_source)
+    return [airline for airline, _ in pairs], [routes for _, routes in pairs]

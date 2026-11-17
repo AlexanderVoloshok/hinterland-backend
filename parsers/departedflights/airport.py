@@ -24,8 +24,9 @@ DATE_PATTERN = (
 )
 
 OPTIONS = {
-    'INCLUDE': ('ADD', 'AMS','BCN', 'BGO','BRU', 'HEL','LIN', 'MXP', 'ORY', 'CDG'), #,
-    'EXCLUDE': ("ZAG", "TIA", "SKP", "BEG", "SJJ", "LJU", "WAW", "KBP", "BTS", "BUD", "BUH", "OTP", "KRK", "RIX", "SOF")
+    'INCLUDE': ('BKK', 'BOS', 'PEK', 'HKG', 'JED', 'FCO', 'SIN', 'SEL', 'VIE', 'YVR', 'LTN', 'SEN', 'STN', 'LHR', 'LGW', 'ATL', 'BOM', 'KEF'), #
+    'EXCLUDE': ("ZAG", "TIA", "SKP", "BEG", "SJJ", "LJU", "WAW", "KBP", "BTS", "BUD", "BUH", "OTP", "KRK", "RIX", "SOF",
+                'ADD', 'AMS', 'BCN', 'BGO','BRU', 'HEL','LIN', 'MXP', 'ORY', 'CDG', 'MAD', 'DUB', 'MAN', 'MUC')
 }
 
 
