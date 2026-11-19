@@ -1,5 +1,6 @@
 services:
   api:
+    image: ghcr.io/alexandervoloshok/hinterland-backend-api:latest
     build: .
     restart: unless-stopped
     env_file:

@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: hinterland-backend-api
+  IMAGE_NAME: alexandervoloshok/hinterland-backend
 
 jobs:
   build-and-push:
